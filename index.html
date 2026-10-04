@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#f5f0e6">
+  <title>东方日记 · Oriental Diary</title>
+  <!-- 日式字体 -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Quill 富文本编辑器 -->
+  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f5f0e6;          /* 和纸米色 */
+      --ink: #2c2c2c;         /* 墨色 */
+      --accent: #8b5a2b;      /* 茶褐色 */
+      --soft: #e8dfd0;
+      --border: #d4c4a8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Serif JP', 'Noto Sans SC', serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      line-height: 1.7;
+    }
+    .container { max-width: 720px; margin: 0 auto; padding: 16px; }
+    header {
+      text-align: center;
+      padding: 24px 0 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    header h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      color: var(--accent);
+    }
+    .date-info {
+      background: var(--soft);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 0.95rem;
+      text-align: center;
+    }
+    .date-info .ganzhi { color: var(--accent); font-weight: 700; margin-top: 4px; }
+    .btn {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+    .list-item {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+    .list-item h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .list-item .meta { font-size: 0.85rem; color: #666; }
+    #editor-container { height: 320px; background: #fff; border-radius: 8px; overflow: hidden; }
+    .ql-toolbar { background: var(--soft) !important; border-color: var(--border) !important; }
+    .ql-container { border-color: var(--border) !important; font-family: 'Noto Serif JP', serif !important; font-size: 16px; }
+    input[type="text"], input[type="email"], input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 1rem;
+      background: #fff;
+      margin-bottom: 12px;
+    }
+    .auth-box, .edit-box { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+    .hidden { display: none !important; }
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
+    footer { text-align: center; padding: 30px 0; font-size: 0.8rem; color: #999; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 登录区 -->
+    <div id="auth-section">
+      <header><h1>東方日記</h1></header>
+      <div class="auth-box">
+        <h2 style="margin-bottom:16px;text-align:center;">登录 / 注册</h2>
+        <input type="email" id="email" placeholder="邮箱">
+        <input type="password" id="password" placeholder="密码（至少6位）">
+        <div class="toolbar" style="justify-content:center;">
+          <button class="btn" onclick="login()">登录</button>
+          <button class="btn btn-outline" onclick="register()">注册</button>
+        </div>
+        <p id="auth-msg" style="text-align:center;color:#c00;margin-top:10px;"></p>
+      </div>
+    </div>
+
+    <!-- 主界面 -->
+    <div id="app-section" class="hidden">
+      <header>
+        <h1>東方日記</h1>
+        <button class="btn btn-outline" style="margin-top:8px;font-size:0.85rem;" onclick="logout()">退出</button>
+      </header>
+
+      <!-- 列表页 -->
+      <div id="list-view">
+        <div class="toolbar">
+          <button class="btn" onclick="showNew()">＋ 写新日记</button>
+        </div>
+        <div id="diary-list"></div>
+      </div>
+
+      <!-- 编辑/查看页 -->
+      <div id="edit-view" class="hidden">
+        <div class="date-info" id="date-display"></div>
+        <input type="text" id="title" placeholder="标题（大字粗体）" style="font-size:1.4rem;font-weight:700;">
+        <div id="editor-container"></div>
+        <div class="toolbar">
+          <button class="btn" onclick="saveDiary()">保存</button>
+          <button class="btn btn-outline" onclick="backToList()">返回</button>
+          <button class="btn btn-outline" id="delete-btn" style="display:none;color:#c00;border-color:#c00;" onclick="deleteDiary()">删除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <footer>东方审美 · 公历农历干支 · 免费云端</footer>
+
+  <!-- 脚本 -->
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lunar-javascript@1.7.7/lunar.js"></script>
+  <script type="module">
+    // ===== 请把下面换成你自己的 Firebase 配置 =====
+    const firebaseConfig = {
+  apiKey: "AIzaSyBL2mvdFzn_qAO10x408EG13bCREOHAHvk",
+  authDomain: "my-oriental-diary.firebaseapp.com",
+  projectId: "my-oriental-diary",
+  storageBucket: "my-oriental-diary.firebasestorage.app",
+  messagingSenderId: "2810023040",
+  appId: "1:2810023040:web:4a5a99ef5bd2397d88aa65"
+};
+    // ==========================================
+
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
+    import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, where } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let quill;
+    let currentId = null;
+    let currentUser = null;
+
+    // 初始化 Quill
+    quill = new Quill('#editor-container', {
+      theme: 'snow',
+      modules: {
+        toolbar: [
+          [{ 'header': [1, 2, false] }],
+          ['bold', 'italic', 'underline'],
+          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+          [{ 'align': [] }],
+          ['clean']
+        ]
+      },
+      placeholder: '在此书写正文……'
+    });
+
+    // 计算公历 + 农历 + 干支
+    function updateDateDisplay(date = new Date()) {
+      const solar = Solar.fromDate(date);
+      const lunar = solar.getLunar();
+      const y = solar.getYear(), m = solar.getMonth(), d = solar.getDay();
+      const h = date.getHours(), mi = date.getMinutes();
+      const week = ['日','一','二','三','四','五','六'][solar.getWeek()];
+
+      const ganzhiYear = lunar.getYearInGanZhi();
+      const ganzhiMonth = lunar.getMonthInGanZhi();
+      const ganzhiDay = lunar.getDayInGanZhi();
+      const ganzhiHour = lunar.getTimeInGanZhi();
+
+      const lunarStr = `${lunar.getYearInChinese()}年${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`;
+
+      document.getElementById('date-display').innerHTML = `
+        <div>${y}年${m}月${d}日 星期${week} ${String(h).padStart(2,'0')}:${String(mi).padStart(2,'0')}</div>
+        <div class="ganzhi">农历 ${lunarStr}</div>
+        <div class="ganzhi">干支：${ganzhiYear}年 ${ganzhiMonth}月 ${ganzhiDay}日 ${ganzhiHour}时</div>
+      `;
+    }
+
+    // 登录状态监听
+    onAuthStateChanged(auth, user => {
+      currentUser = user;
+      if (user) {
+        document.getElementById('auth-section').classList.add('hidden');
+        document.getElementById('app-section').classList.remove('hidden');
+        loadDiaries();
+      } else {
+        document.getElementById('auth-section').classList.remove('hidden');
+        document.getElementById('app-section').classList.add('hidden');
+      }
+    });
+
+    window.login = async () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (e) {
+        document.getElementById('auth-msg').textContent = e.message;
+      }
+    };
+
+    window.register = async () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      try {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } catch (e) {
+        document.getElementById('auth-msg').textContent = e.message;
+      }
+    };
+
+    window.logout = () => signOut(auth);
+
+    async function loadDiaries() {
+      const list = document.getElementById('diary-list');
+      list.innerHTML = '<p style="text-align:center;color:#999;">加载中…</p>';
+      const q = query(collection(db, 'diaries'), where('uid', '==', currentUser.uid), orderBy('createdAt', 'desc'));
+      const snap = await getDocs(q);
+      list.innerHTML = '';
+      if (snap.empty) {
+        list.innerHTML = '<p style="text-align:center;color:#999;padding:40px 0;">还没有日记，点击上方按钮开始书写吧。</p>';
+        return;
+      }
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        div.onclick = () => openDiary(docSnap.id, data);
+        div.innerHTML = `
+          <h3>${data.title || '无标题'}</h3>
+          <div class="meta">${data.dateStr || ''} · ${data.ganzhi || ''}</div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    window.showNew = () => {
+      currentId = null;
+      document.getElementById('title').value = '';
+      quill.setContents([]);
+      updateDateDisplay();
+      document.getElementById('delete-btn').style.display = 'none';
+      document.getElementById('list-view').classList.add('hidden');
+      document.getElementById('edit-view').classList.remove('hidden');
+    };
+
+    function openDiary(id, data) {
+      currentId = id;
+      document.getElementById('title').value = data.title || '';
+      quill.root.innerHTML = data.content || '';
+      // 简单显示原日期
+      document.getElementById('date-display').innerHTML = `
+        <div>${data.dateStr || ''}</div>
+        <div class="ganzhi">${data.ganzhi || ''}</div>
+      `;
+      document.getElementById('delete-btn').style.display = 'inline-block';
+      document.getElementById('list-view').classList.add('hidden');
+      document.getElementById('edit-view').classList.remove('hidden');
+    }
+
+    window.backToList = () => {
+      document.getElementById('edit-view').classList.add('hidden');
+      document.getElementById('list-view').classList.remove('hidden');
+      loadDiaries();
+    };
+
+    window.saveDiary = async () => {
+      const title = document.getElementById('title').value.trim() || '无标题';
+      const content = quill.root.innerHTML;
+      const now = new Date();
+      const solar = Solar.fromDate(now);
+      const lunar = solar.getLunar();
+      const dateStr = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      const ganzhi = `${lunar.getYearInGanZhi()}年 ${lunar.getMonthInGanZhi()}月 ${lunar.getDayInGanZhi()}日 ${lunar.getTimeInGanZhi()}时`;
+
+      const data = {
+        uid: currentUser.uid,
+        title,
+        content,
+        dateStr,
+        ganzhi,
+        createdAt: now.getTime()
+      };
+
+      if (currentId) {
+        await updateDoc(doc(db, 'diaries', currentId), data);
+      } else {
+        await addDoc(collection(db, 'diaries'), data);
+      }
+      alert('保存成功！');
+      backToList();
+    };
+
+    window.deleteDiary = async () => {
+      if (!currentId || !confirm('确定删除这篇日记吗？')) return;
+      await deleteDoc(doc(db, 'diaries', currentId));
+      alert('已删除');
+      backToList();
+    };
+  </script>
+</body>
+</html>
